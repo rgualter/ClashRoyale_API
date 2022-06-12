@@ -1,4 +1,4 @@
-# Clash Royale API
+# Projeto API Clash Royale 
 
 ## Players API
 
