@@ -1,6 +1,6 @@
 provider "aws" {
     profile = "default"
-    region = "us-east-1"
+   region = "us-east-1"
 }
 
 resource "aws_s3_bucket" "apiroyale-raw" {
@@ -27,10 +27,3 @@ resource "aws_s3_bucket" "apiroyale-analytics" {
     }
 }
 
-resource "aws_s3_bucket" "gualter-raw-layer" {
-    bucket = "gualter-raw-layer"
-    tags = {
-        "API" = "APIs"
-        "Layer" = "raw"
-    }
-}
