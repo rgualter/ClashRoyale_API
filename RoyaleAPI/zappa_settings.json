@@ -9,7 +9,7 @@
         "events": [
             {   
                 "function": "royale_api.lambda_function.lambda_handler", 
-                "expression": "rate(7 days)" 
+                "expression": "rate(1 days)" 
             }
         ],
         "memory_size": 128,
