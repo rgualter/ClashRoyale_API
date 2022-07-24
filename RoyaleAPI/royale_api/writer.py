@@ -6,10 +6,8 @@ import tempfile
 from typing import List, Union
 import json
 import boto3
-from api import *
-from ingestors import *
-
-
+from royale_api.api import *
+from royale_api.ingestors import *
 
 
 class DataTypeNotSuportedForIngestionException(Exception):
@@ -18,25 +16,27 @@ class DataTypeNotSuportedForIngestionException(Exception):
         self.message = f"Data type {type(data)} is not supported for ingestion"
         super().__init__(self.message)
 
+
 class DataWriter:
     def __init__(self, api: str, sub_type: str) -> None:
         self.api = api
         self.sub_type = sub_type
-        self.filename = f"{self.api}/{self.sub_type}/{datetime.datetime.now()}.json" 
-    
+        self.filename = f"{self.api}/{self.sub_type}/{datetime.datetime.now()}.json"
+
     def _write_row(self, row: str) -> None:
-        os.makedirs(os.path.dirname(self.filename),exist_ok=True)
+        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
         with open(self.filename, "a") as f:
             for result in row:
                 f.write(result)
 
-
     def _write_to_file(self, data: Union[List, dict]):
-        if isinstance(data,dict): #verifica se data esta é uma instancia de dicionario
+        if isinstance(
+            data, dict
+        ):  # verifica se data esta é uma instancia de dicionario
             self._write_row(json.dumps(data) + "\n")
         elif isinstance(data, List):
             for element in data:
-                self._write_row(json.dumps(element) + "\n") 
+                self._write_row(json.dumps(element) + "\n")
         else:
             raise DataTypeNotSuportedForIngestionException(data)
 
@@ -45,7 +45,7 @@ class DataWriter:
 
 
 class S3PlayerWriter(DataWriter):
-    def __init__(self, api: str, sub_type: str, tag: str) -> None: 
+    def __init__(self, api: str, sub_type: str, tag: str) -> None:
         super().__init__(api, sub_type)
         self.tag = tag
         self.tempfile = NamedTemporaryFile()
@@ -62,8 +62,4 @@ class S3PlayerWriter(DataWriter):
         self._write_file_to_s3()
 
     def _write_file_to_s3(self):
-        self.client.put_object(
-            Body = self.tempfile,
-            Bucket = "apiroyale-raw",
-            Key = self.key
-        )
+        self.client.put_object(Body=self.tempfile, Bucket="apiroyale-raw", Key=self.key)
