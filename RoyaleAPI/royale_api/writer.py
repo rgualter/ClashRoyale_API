@@ -30,9 +30,7 @@ class DataWriter:
                 f.write(result)
 
     def _write_to_file(self, data: Union[List, dict]):
-        if isinstance(
-            data, dict
-        ):  # verifica se data esta é uma instancia de dicionario
+        if isinstance(data, dict):  # verifica se data esta é uma instancia de dicionario
             self._write_row(json.dumps(data) + "\n")
         elif isinstance(data, List):
             for element in data:
