@@ -26,4 +26,3 @@ resource "aws_s3_bucket" "apiroyale-analytics" {
         "Layer" = "analytics"
     }
 }
-
