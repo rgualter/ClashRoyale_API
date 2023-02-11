@@ -6,8 +6,8 @@ import tempfile
 from typing import List, Union
 import json
 import boto3
-from royale_api.api import *
-from royale_api.ingestors import *
+from api import *
+from ingestors import *
 
 
 class DataTypeNotSuportedForIngestionException(Exception):
