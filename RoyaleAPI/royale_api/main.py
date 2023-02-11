@@ -1,7 +1,7 @@
 
 from schedule import repeat, every, run_pending
-from royale_api.ingestors import PlayersApiIngestor
-from royale_api.writer import *
+from ingestors import PlayersApiIngestor
+from writer import *
 
 
 if __name__ == "__main__":
