@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from royale_api.api import PlayersAPI
+from api import PlayersAPI
 
 
 class DataIngestor(ABC):
