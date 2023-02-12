@@ -301,3 +301,4 @@ terraform.rc
 *.txt
 *.toml
 *.lock
+*.csv
