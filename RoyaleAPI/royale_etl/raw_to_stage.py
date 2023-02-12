@@ -8,7 +8,6 @@ import datetime
 from abc import abstractmethod
 from pathlib import Path
 
-
 class FileLoader:
     def __init__(self):
         self.path = Path("data")
