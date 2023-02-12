@@ -296,6 +296,7 @@ terraform.rc
 # my personal
 
 /data
+*/data
 *.json
 *.txt
 *.toml
