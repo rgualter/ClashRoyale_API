@@ -15,7 +15,7 @@ s3 = boto3.client("s3")
 class FileLoader:
     def __init__(self):
         self.path = Path("data")
-        self.files = self.path.glob("*.json")
+        #self.files = self.path.glob("*.json")
         self.output_dir = self.path / "output"
         self.now = datetime.datetime.now()
         self.date_str = self.now.strftime("%Y-%m-%d")

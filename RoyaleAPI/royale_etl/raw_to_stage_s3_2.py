@@ -22,14 +22,15 @@ class DataLoader(ABC):
 
 
 class FileLoader(DataLoader):
-    def __init__(self):
+    def __init__(self, transformer):
         super().__init__()
         self.path = Path("data")
         self.files = self.path.glob("*.json")
+        self.transformer = transformer
 
-    def load_data(self, files):
+    def load_data(self):
         data = pd.DataFrame()
-        self.transformer = DataTransformer()
+        files = self.files
         for file in files:
             file_data = [json.loads(line) for line in open(file)]
             df_team = self.transformer.transform_data(file_data, "team", file)
@@ -40,7 +41,7 @@ class FileLoader(DataLoader):
 
 
 class S3Loader(DataLoader):
-    def __init__(self):
+    def __init__(self, transformer):
         super().__init__()
         self.now = datetime.datetime.now()
         self.date_str = self.now.strftime("%Y-%m-%d")
@@ -49,6 +50,7 @@ class S3Loader(DataLoader):
             f"APIRoyale/players/sub_type=battlelog/extracted_at={self.date_str}/"
         )
         self.bucket_name = "apiroyale-raw"
+        self.transformer = transformer
 
     def read_json_from_s3(self, bucket_name, file_name):
         response = s3.get_object(Bucket=bucket_name, Key=file_name)
@@ -65,7 +67,6 @@ class S3Loader(DataLoader):
         json_files = [f for f in all_files if re.match(date_pattern, f["Key"])]
 
         data = pd.DataFrame()
-        transformer = DataTransformer()
 
         for f in json_files:
             json_data = self.read_json_from_s3(bucket_name, f["Key"])
@@ -196,10 +197,8 @@ class DataWriter:
         self.path = Path("data")
         self.output_dir = self.path / "output"
 
-    def write_to_csv(self):
-        self.data.to_csv(
-            f"{self.output_dir}/{datetime.datetime.now()}.csv", header=True
-        )
+    def write_to_csv(self, data):
+        data.to_csv(f"{self.output_dir}/{datetime.datetime.now()}.csv", header=True)
 
 
 class S3DataWriter(DataWriter):
@@ -211,9 +210,19 @@ class S3DataWriter(DataWriter):
 
 
 if __name__ == "__main__":
-    # Create S3 loader and Load data from S3 bucket
-    s3_loader = S3Loader()
+    # Load data from S3 bucket and apply DataTransformer ETL
+    transformer = DataTransformer()
+    s3_loader = S3Loader(transformer)
     data = s3_loader.load_data()
     # Create S3 data writer and Write transformed data to CSV file
     s3_data_writer = S3DataWriter()
     s3_data_writer.write_to_csv(data)
+
+# if __name__ == "__main__":
+#    # Load data from local repository and apply DataTransformer ETL
+#    transformer = DataTransformer()
+#    loader = FileLoader(transformer)
+#    data = loader.load_data()
+#    # Write transformed data to CSV file
+#    data_writer = DataWriter()
+#    data_writer.write_to_csv(data)
