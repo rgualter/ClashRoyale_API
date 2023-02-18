@@ -1,4 +1,3 @@
-
 import json
 import logging
 import pandas as pd
@@ -13,10 +12,9 @@ import re
 
 s3 = boto3.client("s3")
 
-# exemplo de uso
 bucket_name = "apiroyale-raw"
 
-#file_name = "APIRoyale/players/sub_type=battlelog/extracted_at=2023-02-05/#YLY8GJ0LY_2023-02-05 17:10:56.950056.json"
+# file_name = "APIRoyale/players/sub_type=battlelog/extracted_at=2023-02-05/#YLY8GJ0LY_2023-02-05 17:10:56.950056.json"
 
 # Obtém a data atual
 now = datetime.datetime.now()
@@ -43,3 +41,4 @@ def read_multiple_jsons_from_s3(bucket_name, prefix, date_pattern):
 
 json_data = read_multiple_jsons_from_s3(bucket_name, prefix, date_pattern)
 print(json_data)
+#type(json_data)
