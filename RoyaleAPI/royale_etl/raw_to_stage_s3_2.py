@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 
 s3 = boto3.client("s3")
 
+
 class DataLoader(ABC):
     def __init__(self):
         self.data = None
@@ -19,12 +20,12 @@ class DataLoader(ABC):
     def load_data(self):
         pass
 
+
 class FileLoader(DataLoader):
     def __init__(self):
         super().__init__()
         self.path = Path("data")
         self.files = self.path.glob("*.json")
-        #self.output_dir = self.path / "output"
 
     def load_data(self, files):
         data = pd.DataFrame()
@@ -37,13 +38,16 @@ class FileLoader(DataLoader):
             data = pd.concat([data, file_data], ignore_index=True)
         return data
 
+
 class S3Loader(DataLoader):
     def __init__(self):
         super().__init__()
         self.now = datetime.datetime.now()
         self.date_str = self.now.strftime("%Y-%m-%d")
         self.date_pattern = r".*\d{4}-\d{2}-\d{2}.*\.json"
-        self.prefix = f"APIRoyale/players/sub_type=battlelog/extracted_at={self.date_str}/"
+        self.prefix = (
+            f"APIRoyale/players/sub_type=battlelog/extracted_at={self.date_str}/"
+        )
         self.bucket_name = "apiroyale-raw"
 
     def read_json_from_s3(self, bucket_name, file_name):
@@ -56,7 +60,7 @@ class S3Loader(DataLoader):
         prefix = self.prefix
         date_pattern = self.date_pattern
 
-        response = s3.list_objects_v2(Bucket= bucket_name, Prefix = prefix)
+        response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
         all_files = response.get("Contents", [])
         json_files = [f for f in all_files if re.match(date_pattern, f["Key"])]
 
@@ -72,9 +76,10 @@ class S3Loader(DataLoader):
 
         return data
 
+
 class DataTransformer:
     def __init__(self):
-        self.load = FileLoader()
+        pass
 
     def get_FilenameColumns(self, files):
         raw_file_name = os.path.basename(files)
@@ -185,6 +190,7 @@ class DataTransformer:
         df = self.delete_columns(df, type)
         return df
 
+
 class DataWriter:
     def __init__(self):
         self.path = Path("data")
@@ -195,15 +201,13 @@ class DataWriter:
             f"{self.output_dir}/{datetime.datetime.now()}.csv", header=True
         )
 
+
 class S3DataWriter(DataWriter):
     def __init__(self):
         super().__init__()
 
-
     def write_to_csv(self, data):
-        data.to_csv(
-            f"{self.output_dir}/{datetime.datetime.now()}.csv", header=True
-        )
+        data.to_csv(f"{self.output_dir}/{datetime.datetime.now()}.csv", header=True)
 
 
 if __name__ == "__main__":
