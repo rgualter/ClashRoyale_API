@@ -29,8 +29,8 @@ def read_multiple_jsons_from_s3(bucket_name, prefix, date_pattern):
 bucket_name = "apiroyale-raw"
 
 file_name = "APIRoyale/players/sub_type=battlelog/extracted_at=2023-02-05/#YLY8GJ0LY_2023-02-05 17:10:56.950056.json"
-prefix = "my-json-folder/"
+prefix = "APIRoyale/players/sub_type=battlelog/extracted_at=2023-02-05/"
 date_pattern = r".*\d{4}-\d{2}-\d{2}.*\.json"
-json_data = read_json_from_s3(bucket_name, file_name)
-#json_data = read_json_from_s3(bucket_name, prefix, date_pattern)
+#json_data = read_json_from_s3(bucket_name, file_name)
+json_data = read_multiple_jsons_from_s3(bucket_name, prefix, date_pattern)
 print(json_data)
