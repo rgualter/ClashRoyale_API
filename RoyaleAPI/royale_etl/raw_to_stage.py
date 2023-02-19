@@ -1,34 +1,88 @@
-#%%
+import io
 import json
-import logging
 import pandas as pd
 import os
-import glob
 import datetime
-from abc import abstractmethod
 from pathlib import Path
+import boto3
+import re
+from abc import ABC, abstractmethod
+from tempfile import NamedTemporaryFile, SpooledTemporaryFile
+from io import StringIO, BytesIO
+import csv
 
-class FileLoader:
+s3 = boto3.client("s3")
+
+
+class DataLoader(ABC):
     def __init__(self):
+        self.transformer = DataTransformer()
+
+    @abstractmethod
+    def load_data(self):
+        pass
+
+
+class FileLoader(DataLoader):
+    def __init__(self):
+        super().__init__()
         self.path = Path("data")
         self.files = self.path.glob("*.json")
-        self.output_dir = self.path / "output"
 
-    def load_files(self, files):
+    def load_data(self):
         data = pd.DataFrame()
-        self.transformer = DataTransformer()
+        files = self.files
+        transformer = self.transformer
+
         for file in files:
             file_data = [json.loads(line) for line in open(file)]
-            df_team = self.transformer.transform_data(file_data, "team", file)
-            df_opponent = self.transformer.transform_data(file_data, "opponent", file)
+            df_team = transformer.transform_data(file_data, "team", file)
+            df_opponent = transformer.transform_data(file_data, "opponent", file)
             file_data = pd.concat([df_team, df_opponent])
             data = pd.concat([data, file_data], ignore_index=True)
         return data
 
 
+class S3Loader(DataLoader):
+    def __init__(self):
+        super().__init__()
+        self.now = datetime.datetime.now()
+        self.date_str = self.now.strftime("%Y-%m-%d")
+        self.date_pattern = r".*\d{4}-\d{2}-\d{2}.*\.json"
+        self.prefix = (
+            f"APIRoyale/players/sub_type=battlelog/extracted_at={self.date_str}/"
+        )
+        self.bucket_name = "apiroyale-raw"
+
+    def read_json_from_s3(self, bucket_name, file_name):
+        response = s3.get_object(Bucket=bucket_name, Key=file_name)
+        json_file = response["Body"].read().decode("utf-8").splitlines()
+        return [json.loads(line) for line in json_file]
+
+    def load_data(self):
+        data = pd.DataFrame()
+        bucket_name = self.bucket_name
+        prefix = self.prefix
+        date_pattern = self.date_pattern
+        transformer = self.transformer
+
+        response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+        all_files = response.get("Contents", [])
+        json_files = [f for f in all_files if re.match(date_pattern, f["Key"])]
+
+        for f in json_files:
+            json_data = self.read_json_from_s3(bucket_name, f["Key"])
+            df_team = transformer.transform_data(json_data, "team", f["Key"])
+            df_opponent = transformer.transform_data(json_data, "opponent", f["Key"])
+            file_data = pd.concat([df_team, df_opponent])
+            data = pd.concat([data, file_data], ignore_index=True)
+
+        return data
+
+
 class DataTransformer:
     def __init__(self):
-        self.load = FileLoader()
+        pass
 
     def get_FilenameColumns(self, files):
         raw_file_name = os.path.basename(files)
@@ -97,36 +151,6 @@ class DataTransformer:
             inplace=True,
         )
 
-    # def rename_columns(self,df,type):
-    #        for t in type:
-    #                df.rename(
-    #                columns={
-    #                    "m." + t + ".startingTrophies": "m.startingTrophies",
-    #                    "m." + t + ".trophyChange": "m.trophyChange",
-    #                    "m." + t + ".crowns": "m.crowns",
-    #                    "m." + t + ".kingTowerHitPoints": "m.kingTowerHitPoints",
-    #                    "m." + t + ".clan.tag": "m.clan.tag",
-    #                    "m." + t + ".clan.name": "m.clan.name",
-    #                    "m." + t + ".tag": "m.team.tag",
-    #                    "m." + t + ".name": "m.team.name"
-    #                },
-    #                inplace=True,
-    #            )
-    #        return df
-
-    # def rename_columns(self,df,type):
-    #    mappings = {f"m.{type}.startingTrophies": "m.startingTrophies",
-    #                f"m.{type}.trophyChange": "m.trophyChange",
-    #                f"m.{type}.crowns": "m.crowns",
-    #                f"m.{type}.kingTowerHitPoints": "m.kingTowerHitPoints",
-    #                f"m.{type}.clan.tag": "m.clan.tag",
-    #                f"m.{type}.clan.name": "m.clan.name",
-    #                f"m.{type}.tag": "m.team.tag",
-    #                f"m.{type}.name": "m.team.name"}
-    #    for _ in type:
-    #        df.rename(columns=mappings, inplace=True)
-    #    return df
-
     def _json_normalize(self, data, type):
         # sourcery skip: inline-immediately-returned-variable
         df = pd.json_normalize(
@@ -172,17 +196,37 @@ class DataTransformer:
 
 class DataWriter:
     def __init__(self):
-        self.transformer = DataTransformer()
-        self.load = FileLoader()
-        self.data = self.load.load_files(self.load.files)
-        self.output_dir = self.load.output_dir
+        self.path = Path("data")
+        self.output_dir = self.path / "output"
 
-    def write_to_csv(self):
-        self.data.to_csv(
-            f"{self.output_dir}/{datetime.datetime.now()}.csv", header=True
-        )
+    def write_to_csv(self, data):
+        data.to_csv(f"{self.output_dir}/{datetime.datetime.now()}.csv", header=True)
 
-#%%
+
+class S3DataWriter(DataWriter):
+    def __init__(self):
+        super().__init__()
+        self.now = datetime.datetime.now()
+        self.date_str = self.now.date()  # strftime("%Y-%m-%d")
+        self.client = boto3.client("s3")
+        self.bucket_name = "apiroyale-stage"
+        self.key = f"APIRoyale/players/sub_type=battlelog/transformed_at={self.date_str}/{self.now}.csv"
+
+    def write_to_csv_s3(self, data):
+        csv_buffer = io.StringIO()
+        data.to_csv(csv_buffer, index=False)
+        body = csv_buffer.getvalue()
+        self.client.put_object(Bucket=self.bucket_name, Key=self.key, Body=body)
+
+    def write(self, data):
+        self.write_to_csv_s3(data)
+        self.write_to_csv(data)
+
+
 if __name__ == "__main__":
-    file_writer = DataWriter()
-    file_writer.write_to_csv()
+    # Load data from S3 bucket and apply DataTransformer ETL
+    loader = S3Loader()
+    data = loader.load_data()
+    # Create S3 data writer and Write transformed data to CSV file
+    data_writer = S3DataWriter()
+    data_writer.write_to_csv_s3(data)
