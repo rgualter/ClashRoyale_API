@@ -10,8 +10,12 @@ from abc import ABC, abstractmethod
 from tempfile import NamedTemporaryFile, SpooledTemporaryFile
 from io import StringIO, BytesIO
 import csv
+import logging
 
 s3 = boto3.client("s3")
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 
 
 class DataLoader(ABC):
@@ -53,6 +57,7 @@ class S3Loader(DataLoader):
             f"APIRoyale/players/sub_type=battlelog/extracted_at={self.date_str}/"
         )
         self.bucket_name = "apiroyale-raw"
+    
 
     def read_json_from_s3(self, bucket_name, file_name):
         response = s3.get_object(Bucket=bucket_name, Key=file_name)
@@ -69,6 +74,12 @@ class S3Loader(DataLoader):
         response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
         all_files = response.get("Contents", [])
         json_files = [f for f in all_files if re.match(date_pattern, f["Key"])]
+
+        if not json_files:
+            print(f"No data found for date {self.date_str} in bucket {bucket_name}")
+            return data
+        
+        logger.info(f"Loading data from: {bucket_name}")
 
         for f in json_files:
             json_data = self.read_json_from_s3(bucket_name, f["Key"])
@@ -183,6 +194,8 @@ class DataTransformer:
         self.data = data
         self.file = file
 
+        logger.info(f"Transforming data: Type: {type} from: {file}")
+
         df = self._json_normalize(data, type)
         df["team_or_opponent"] = type
         self.split_columns(df)
@@ -216,6 +229,7 @@ class S3DataWriter(DataWriter):
         csv_buffer = io.StringIO()
         data.to_csv(csv_buffer, index=False)
         body = csv_buffer.getvalue()
+        logger.info(f"Writing data to: Bucket:{self.bucket_name}/{self.key}")
         self.client.put_object(Bucket=self.bucket_name, Key=self.key, Body=body)
 
     def write(self, data):
@@ -230,3 +244,8 @@ if __name__ == "__main__":
     # Create S3 data writer and Write transformed data to CSV file
     data_writer = S3DataWriter()
     data_writer.write_to_csv_s3(data)
+
+#datas de geracao do arquivo
+#salvar parquet
+#refatorar
+#versao spark
