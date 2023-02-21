@@ -11,6 +11,8 @@ from tempfile import NamedTemporaryFile, SpooledTemporaryFile
 from io import StringIO, BytesIO
 import csv
 import logging
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 s3 = boto3.client("s3")
 logger = logging.getLogger(__name__)
@@ -64,7 +66,7 @@ class S3Loader(DataLoader):
         json_file = response["Body"].read().decode("utf-8").splitlines()
         return [json.loads(line) for line in json_file]
 
-    def load_data(self):
+    def load_data(self):  # sourcery skip: raise-specific-error
         data = pd.DataFrame()
         bucket_name = self.bucket_name
         prefix = self.prefix
@@ -76,8 +78,9 @@ class S3Loader(DataLoader):
         json_files = [f for f in all_files if re.match(date_pattern, f["Key"])]
 
         if not json_files:
-            print(f"No data found for date {self.date_str} in bucket {bucket_name}")
-            return data
+            msg = f"No data found for date {self.date_str} in bucket {bucket_name}"
+            logging.error(msg)
+            raise Exception(msg)
         
         logger.info(f"Loading data from: {bucket_name}")
 
@@ -217,24 +220,35 @@ class DataWriter:
 
 
 class S3DataWriter(DataWriter):
-    def __init__(self):
+    def __init__(self, data, format):
         super().__init__()
         self.now = datetime.datetime.now()
         self.date_str = self.now.date()  # strftime("%Y-%m-%d")
         self.client = boto3.client("s3")
         self.bucket_name = "apiroyale-stage"
-        self.key = f"APIRoyale/players/sub_type=battlelog/transformed_at={self.date_str}/{self.now}.csv"
+        self.format = f"{format}"
+        self.key = f"APIRoyale/players/sub_type=battlelog/transformed_at={self.date_str}/{self.now}.{self.format}"
+        self.data = data
 
-    def write_to_csv_s3(self, data):
+    def write_to_csv_s3(self):
         csv_buffer = io.StringIO()
         data.to_csv(csv_buffer, index=False)
         body = csv_buffer.getvalue()
-        logger.info(f"Writing data to: Bucket:{self.bucket_name}/{self.key}")
+        logger.info(f"Writing csv data to: Bucket:{self.bucket_name}/{self.key}")
         self.client.put_object(Bucket=self.bucket_name, Key=self.key, Body=body)
 
-    def write(self, data):
+    def write_parquet_to_s3(self):
+        buffer = BytesIO()
+        table = pa.Table.from_pandas(data)
+        pq.write_table(table, buffer)
+        buffer.seek(0)
+        logger.info(f"Writing parquet data to: Bucket:{self.bucket_name}/{self.key}")
+        self.client.upload_fileobj(buffer, self.bucket_name, self.key)
+
+    def write(self):
         self.write_to_csv_s3(data)
         self.write_to_csv(data)
+        self.write_parquet_to_s3(data)
 
 
 if __name__ == "__main__":
@@ -242,10 +256,8 @@ if __name__ == "__main__":
     loader = S3Loader()
     data = loader.load_data()
     # Create S3 data writer and Write transformed data to CSV file
-    data_writer = S3DataWriter()
-    data_writer.write_to_csv_s3(data)
+    data_writer = S3DataWriter(data, "parquet")
+    data_writer.write_parquet_to_s3()
 
-#datas de geracao do arquivo
-#salvar parquet
-#refatorar
 #versao spark
+#refatorar
