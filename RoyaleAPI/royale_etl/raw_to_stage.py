@@ -258,6 +258,3 @@ if __name__ == "__main__":
     # Create S3 data writer and Write transformed data to CSV file
     data_writer = S3DataWriter(data, "parquet")
     data_writer.write_parquet_to_s3()
-
-#versao spark
-#refatorar
